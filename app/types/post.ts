@@ -19,6 +19,8 @@ export type Post = {
   parentPostId?: string | null;
   isTopicPost?: number;
   deadline?: number | null;
+  aiAnalysis?: string;
+  aiAnalysisUpdatedAt?: number | null;
   comments?: Comment[];
   commentCount?: number;
   likes?: number;

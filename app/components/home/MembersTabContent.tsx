@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
 import { useAppTheme } from "@/app/hooks/useAppTheme";
 import { Card, CardBody, Chip } from "@/app/components/ui";
 import { Users } from "lucide-react";
 import { usePosts } from "@/app/hooks/usePosts";
 import { useIconUrlMap } from "@/app/hooks/useIconUrl";
+import { useMemberAnalysis } from "@/app/hooks/useAIAnalysis";
 import { tv } from "tailwind-variants";
 
 const memberSection = tv({
@@ -46,6 +47,44 @@ export function MembersTabContent() {
   const getMemberIcon = useIconUrlMap(memberIconMap);
 
   const [aiReadingEnabled, setAiReadingEnabled] = useState(true);
+  const [analysisByMemberKey, setAnalysisByMemberKey] = useState<Record<string, string>>({});
+  const requestedEmailsRef = useRef<Set<string>>(new Set());
+  const { analyze } = useMemberAnalysis();
+
+  useEffect(() => {
+    memberProfiles.forEach((member) => {
+      const email = member.email;
+      if (!email || requestedEmailsRef.current.has(email)) {
+        return;
+      }
+
+      if (member.aiSummary && member.aiSummary.trim().length > 0) {
+        return;
+      }
+
+      requestedEmailsRef.current.add(email);
+
+      void analyze({
+        penName: member.penName || "部員",
+        email,
+        autoFetch: true,
+        limit: 10,
+      })
+        .then((result) => {
+          const analysis = (result as { analysis?: string } | undefined)?.analysis;
+          if (!analysis) {
+            return;
+          }
+          setAnalysisByMemberKey((prev) => ({
+            ...prev,
+            [email]: analysis,
+          }));
+        })
+        .catch(() => {
+          // 失敗時は既存表示（プレースホルダ）を使う
+        });
+    });
+  }, [memberProfiles, analyze]);
   useEffect(() => {
     try {
       const saved = localStorage.getItem("lit-club-ai-reading-enabled");
@@ -56,6 +95,7 @@ export function MembersTabContent() {
   }, []);
 
   const sessionEmail = session?.user?.email;
+
   return (
     <div className="p-4 space-y-3">
       {memberProfiles.length === 0 ? (
@@ -102,7 +142,7 @@ export function MembersTabContent() {
                   <div className={memberAiSection({ theme: appTheme })}>
                     <p className="text-xs font-black uppercase text-black chrome:text-white mb-1">AI短文分析</p>
                     <p className="text-sm font-semibold text-black chrome:text-white">
-                      {member.aiSummary || "過去投稿ベースのAI分析は準備中です。"}
+                      {analysisByMemberKey[member.email] || member.aiSummary || "分析を作成中です..."}
                     </p>
                   </div>
                 )}

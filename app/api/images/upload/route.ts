@@ -90,8 +90,8 @@ export async function POST(request: Request) {
 
     await r2Client.send(command);
 
-    // 画像URLを構築
-    const imageUrl = `${R2_PUBLIC_URL}/${fileName}`;
+    // 画像URLを構築（同一キー更新時のキャッシュ回避用に version を付与）
+    const imageUrl = `${R2_PUBLIC_URL}/${fileName}?v=${Date.now()}`;
 
     return NextResponse.json({ success: true, imageUrl });
   } catch (error: any) {

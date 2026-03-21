@@ -4,18 +4,10 @@ interface TopicAnalysis {
   overview: string;
   strengths: string[];
   suggestions: string[];
-  authorFeedback: Array<{
-    author: string;
-    praise: string;
-    critique: string;
-    nextStep: string;
-  }>;
   postFeedback: Array<{
     postId: string;
     title: string;
     praise: string;
-    critique: string;
-    nextStep: string;
   }>;
 }
 
@@ -25,7 +17,8 @@ interface AIAnalysisSectionProps {
   analysisLoading: boolean;
   analysisError: string | null;
   analysisResult: TopicAnalysis | null;
-  onGenerate: () => void;
+  isDeadlineExpired: boolean;
+  onToggleDeadline: () => void;
 }
 
 export function AIAnalysisSection({
@@ -34,7 +27,8 @@ export function AIAnalysisSection({
   analysisLoading,
   analysisError,
   analysisResult,
-  onGenerate,
+  isDeadlineExpired,
+  onToggleDeadline,
 }: AIAnalysisSectionProps) {
   return (
     <div className="flex flex-col gap-4">
@@ -43,13 +37,21 @@ export function AIAnalysisSection({
           AI講評
         </h3>
         <button
-          onClick={onGenerate}
-          disabled={analysisLoading || repliesCount === 0}
+          onClick={onToggleDeadline}
+          disabled={analysisLoading}
           className="px-4 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {analysisLoading ? "生成中..." : "分析を生成"}
+          {analysisLoading
+            ? "処理中..."
+            : isDeadlineExpired
+              ? "締め切り解除"
+              : "お題を締め切る"}
         </button>
       </div>
+
+      <p className="text-xs text-slate-500 chrome:text-slate-300">
+        AI講評は締め切り後に生成されます。締め切り解除後に再度締め切ると再生成できます。
+      </p>
 
       {!aiReadingEnabled && (
         <p className="text-sm text-slate-500 chrome:text-slate-200">
@@ -69,7 +71,7 @@ export function AIAnalysisSection({
         </p>
       )}
 
-      {analysisResult && (
+      {analysisResult && isDeadlineExpired && (
         <div className="space-y-4">
           <div>
             <p className="text-sm font-semibold text-slate-700 chrome:text-slate-100 mb-1">
@@ -79,59 +81,10 @@ export function AIAnalysisSection({
               {analysisResult.overview}
             </p>
           </div>
-
-          <div>
-            <p className="text-sm font-semibold text-slate-700 chrome:text-slate-100 mb-1">
-              良かった点
-            </p>
-            <ul className="list-disc pl-5 text-sm text-slate-600 chrome:text-slate-100 space-y-1">
-              {analysisResult.strengths?.map((item, idx) => (
-                <li key={`strength-${idx}`}>{item}</li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-slate-700 chrome:text-slate-100 mb-1">
-              改善提案
-            </p>
-            <ul className="list-disc pl-5 text-sm text-slate-600 chrome:text-slate-100 space-y-1">
-              {analysisResult.suggestions?.map((item, idx) => (
-                <li key={`suggestion-${idx}`}>{item}</li>
-              ))}
-            </ul>
-          </div>
-
+          
           <div>
             <p className="text-sm font-semibold text-slate-700 chrome:text-slate-100 mb-2">
-              投稿者ごとの講評
-            </p>
-            <div className="space-y-2">
-              {analysisResult.authorFeedback?.map((item, idx) => (
-                <div
-                  key={`author-${idx}`}
-                  className="rounded-lg border border-slate-200 chrome:border-slate-700 p-3"
-                >
-                  <p className="text-sm font-bold text-slate-800 chrome:text-slate-100">
-                    {item.author}
-                  </p>
-                  <p className="text-sm text-slate-600 chrome:text-slate-100 mt-1">
-                    ほめる: {item.praise}
-                  </p>
-                  <p className="text-sm text-slate-600 chrome:text-slate-100 mt-1">
-                    批評: {item.critique}
-                  </p>
-                  <p className="text-sm text-slate-600 chrome:text-slate-100 mt-1">
-                    次の一歩: {item.nextStep}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-slate-700 chrome:text-slate-100 mb-2">
-              投稿ごとの講評
+              各作品の分析
             </p>
             <div className="space-y-2">
               {analysisResult.postFeedback?.map((item, idx) => (
@@ -143,13 +96,7 @@ export function AIAnalysisSection({
                     {item.title}
                   </p>
                   <p className="text-sm text-slate-600 chrome:text-slate-100 mt-1">
-                    ほめる: {item.praise}
-                  </p>
-                  <p className="text-sm text-slate-600 chrome:text-slate-100 mt-1">
-                    批評: {item.critique}
-                  </p>
-                  <p className="text-sm text-slate-600 chrome:text-slate-100 mt-1">
-                    次の一歩: {item.nextStep}
+                    講評: {item.praise}
                   </p>
                 </div>
               ))}

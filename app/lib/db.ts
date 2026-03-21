@@ -362,6 +362,37 @@ export class D1Client {
       params: [post.title, post.body, post.updatedAt, post.postId],
     });
   }
+
+  async updateTopicDeadline(post: {
+    postId: string;
+    deadline: number | null;
+    updatedAt: number;
+  }) {
+    const checkResult = await this.execute<{ isTopicPost: number }>({
+      sql: `SELECT isTopicPost FROM posts WHERE id = ? LIMIT 1`,
+      params: [post.postId],
+    });
+
+    if (!checkResult.success || !checkResult.results || checkResult.results.length === 0) {
+      return {
+        success: false,
+        error: "Post not found",
+      };
+    }
+
+    const existingPost = checkResult.results[0] as { isTopicPost: number };
+    if (Number(existingPost.isTopicPost || 0) !== 1) {
+      return {
+        success: false,
+        error: "Only topic posts can update deadline",
+      };
+    }
+
+    return this.execute({
+      sql: `UPDATE posts SET deadline = ?, updatedAt = ? WHERE id = ?`,
+      params: [post.deadline, post.updatedAt, post.postId],
+    });
+  }
 }
 
 /**

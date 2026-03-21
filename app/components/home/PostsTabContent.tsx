@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useAppTheme } from "@/app/hooks/useAppTheme";
@@ -40,6 +42,56 @@ export function PostsTabContent({
     getDisplayIcon,
     getDisplayName,
   } = usePosts();
+
+  const [reviewByPostId, setReviewByPostId] = useState<Record<string, string>>({});
+  const [reviewErrorByPostId, setReviewErrorByPostId] = useState<Record<string, string>>({});
+
+  const visiblePosts = [...topicReplies, ...freePosts].sort(
+    (a, b) => (b.createdAt || 0) - (a.createdAt || 0)
+  );
+
+  useEffect(() => {
+    if (visiblePosts.length === 0) {
+      return;
+    }
+
+    void Promise.all(
+      visiblePosts.map(async (post) => {
+        try {
+          const response = await fetch(`/api/analysis/post?postId=${post.id}`);
+          const data = (await response.json()) as { review?: string | null; error?: string };
+
+          if (!response.ok) {
+            throw new Error(data.error || "講評の取得に失敗しました");
+          }
+
+          return {
+            postId: post.id,
+            review: data.review || "",
+            error: "",
+          };
+        } catch (error) {
+          return {
+            postId: post.id,
+            review: "",
+            error: error instanceof Error ? error.message : "講評の取得に失敗しました",
+          };
+        }
+      })
+    ).then((results) => {
+      const nextReviewMap: Record<string, string> = {};
+      const nextErrorMap: Record<string, string> = {};
+
+      results.forEach((item) => {
+        nextReviewMap[item.postId] = item.review;
+        nextErrorMap[item.postId] = item.error;
+      });
+
+      setReviewByPostId(nextReviewMap);
+      setReviewErrorByPostId(nextErrorMap);
+    });
+  }, [topicReplies, freePosts]);
+
   return (
     <>
       <div className="p-3 space-y-3">
@@ -51,9 +103,7 @@ export function PostsTabContent({
           </div>
         ) : (
           <>
-            {[...topicReplies, ...freePosts]
-              .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-              .map((post) => {
+            {visiblePosts.map((post) => {
               const isTopicReply = !!post.parentPostId;
               return (
                 <Card 
@@ -118,6 +168,23 @@ export function PostsTabContent({
                         </div>
                       </div>
                     </Link>
+
+                    {session && (
+                      <div className="space-y-2">
+                        {reviewByPostId[post.id] && (
+                          <div className="p-3 rounded-lg border-2 border-black/80 chrome:border-white/60 bg-white/90 chrome:bg-black/40">
+                            <p className="text-xs font-black uppercase text-gray-700 chrome:text-green-300 mb-1">AI講評</p>
+                            <p className="text-sm font-semibold text-gray-800 chrome:text-gray-100 whitespace-pre-wrap">
+                              {reviewByPostId[post.id]}
+                            </p>
+                          </div>
+                        )}
+
+                        {reviewErrorByPostId[post.id] && (
+                          <p className="text-xs font-bold text-red-600">{reviewErrorByPostId[post.id]}</p>
+                        )}
+                      </div>
+                    )}
                   </CardBody>
                 </Card>
               );

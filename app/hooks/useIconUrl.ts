@@ -14,8 +14,10 @@ export function useIconUrl(
     ([, e]) => hashEmail(e),
   );
 
+  // Prefer the stored URL (can contain cache-busting query params).
+  if (storedUrl) return storedUrl;
   if (hash) return buildIconUrl(hash);
-  return storedUrl || null;
+  return null;
 }
 
 /**
@@ -45,10 +47,14 @@ export function useIconUrlMap(
   return useCallback(
     (email: string | null | undefined): string | null => {
       if (!email) return null;
+      const stored = userIconMap[email];
+      if (stored) {
+        return stored;
+      }
       if (R2_PUBLIC_URL && hashMap?.[email]) {
         return buildIconUrl(hashMap[email]);
       }
-      return userIconMap[email] || null;
+      return null;
     },
     [hashMap, userIconMap],
   );

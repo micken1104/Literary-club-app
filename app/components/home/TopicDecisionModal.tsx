@@ -21,7 +21,6 @@ export function TopicDecisionModal({ isOpen, onClose }: TopicDecisionModalProps)
 
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [selectedPoolTopicId, setSelectedPoolTopicId] = useState<string | null>(null);
-  const [proposalDeadline, setProposalDeadline] = useState<number | null>(null);
 
   if (!isOpen) return null;
 
@@ -58,19 +57,17 @@ export function TopicDecisionModal({ isOpen, onClose }: TopicDecisionModalProps)
   };
 
   const handleConfirm = () => {
-    if (!proposalDeadline) return;
-
     const candidate = selectedProposal || selectedPoolTopic;
     if (!candidate) return;
 
     const topicData: Record<string, unknown> = selectedProposal
-      ? { ...selectedProposal, isTopicPost: 1, deadline: proposalDeadline, tag: "お題" }
+      ? { ...selectedProposal, isTopicPost: 1, deadline: null, tag: "お題" }
       : {
           title: candidate.title,
           body: candidate.body,
           tag: "お題",
           isTopicPost: 1,
-          deadline: proposalDeadline,
+          deadline: null,
           author: penName || session?.user?.name || "匿名部員",
           authorEmail: session?.user?.email || null,
         };
@@ -81,7 +78,6 @@ export function TopicDecisionModal({ isOpen, onClose }: TopicDecisionModalProps)
         alert("お題を追加しました！");
         setSelectedProposalId(null);
         setSelectedPoolTopicId(null);
-        setProposalDeadline(null);
         onClose();
       },
       onError: () => {
@@ -172,18 +168,6 @@ export function TopicDecisionModal({ isOpen, onClose }: TopicDecisionModalProps)
                 </select>
               </div>
 
-              <input
-                type="datetime-local"
-                className="w-full border border-gray-300 chrome:border-green-400 rounded-lg px-3 py-2 bg-white chrome:bg-gray-900 text-slate-900 chrome:text-green-300 font-semibold"
-                onChange={(e) => {
-                  if (e.target.value) {
-                    setProposalDeadline(new Date(e.target.value).getTime());
-                  } else {
-                    setProposalDeadline(null);
-                  }
-                }}
-              />
-
               {selectedDecisionCandidate ? (
                 <div className="rounded-lg border border-gray-200 chrome:border-green-400 bg-gray-50 chrome:bg-gray-900 p-3">
                   <p className="text-sm font-semibold text-slate-900 chrome:text-green-300">
@@ -211,7 +195,7 @@ export function TopicDecisionModal({ isOpen, onClose }: TopicDecisionModalProps)
             キャンセル
           </button>
           <button
-            disabled={(!selectedProposalId && !selectedPoolTopicId) || !proposalDeadline || isMutating}
+            disabled={(!selectedProposalId && !selectedPoolTopicId) || isMutating}
             onClick={handleConfirm}
             className="px-6 py-3 bg-pink-500 chrome:bg-[#00FFFF] text-white chrome:text-gray-900 rounded-lg font-black uppercase border-3 border-white chrome:border-green-400 shadow-street-hard chrome:shadow-[0_0_20px_rgba(0,255,255,0.6)] hover:translate-y-[-2px] hover:shadow-street-hard-hover chrome:hover:shadow-[0_0_30px_rgba(0,255,255,0.8)] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >

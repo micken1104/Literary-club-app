@@ -124,6 +124,7 @@ export default function TopicPage() {
   const {
     saveReply: triggerSaveReply,
     saveEditedPost: triggerSaveEditedPost,
+    toggleTopicDeadline,
     deletePost,
   } = usePostMutations({
     session,
@@ -148,6 +149,21 @@ export default function TopicPage() {
   const isDeadlineExpired = (deadline: number | null | undefined) => {
     if (!deadline) return false;
     return Date.now() > deadline;
+  };
+
+  const handleToggleTopicDeadline = () => {
+    if (!topic || topic.isTopicPost !== 1) {
+      return;
+    }
+
+    const expired = isDeadlineExpired(topic.deadline);
+    const nextDeadline = expired ? null : Date.now();
+
+    toggleTopicDeadline(topic.id, nextDeadline, () => {
+      if (!expired) {
+        void generateAnalysis(true);
+      }
+    });
   };
 
   const { trigger: triggerParseFile, isMutating: isParsing } = useSWRMutation(
@@ -249,7 +265,8 @@ export default function TopicPage() {
             analysisLoading={analysisLoading}
             analysisError={analysisError}
             analysisResult={analysisResult}
-            onGenerate={generateAnalysis}
+            isDeadlineExpired={isDeadlineExpired(topic.deadline)}
+            onToggleDeadline={handleToggleTopicDeadline}
           />
         </div>
         )}

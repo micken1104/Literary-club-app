@@ -156,6 +156,23 @@ export async function PATCH(request: Request) {
     const db = getD1Client();
     const data = await request.json();
 
+    if (data.postId && Object.prototype.hasOwnProperty.call(data, "deadline")) {
+      const result = await db.updateTopicDeadline({
+        postId: data.postId,
+        deadline: data.deadline === null ? null : Number(data.deadline),
+        updatedAt: Date.now(),
+      });
+
+      if (!result.success) {
+        return NextResponse.json(
+          { error: result.error || "Failed to update topic deadline" },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({ message: "Success" });
+    }
+
     if (!data.postId || !data.title || !data.body || !data.authorEmail) {
       return NextResponse.json(
         { error: "postId, title, body, and authorEmail are required" },

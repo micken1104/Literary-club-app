@@ -1,21 +1,13 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 
 type TopicAnalysis = {
   overview: string;
   strengths: string[];
   suggestions: string[];
-  authorFeedback: Array<{
-    author: string;
-    praise: string;
-    critique: string;
-    nextStep: string;
-  }>;
   postFeedback: Array<{
     postId: string;
     title: string;
     praise: string;
-    critique: string;
-    nextStep: string;
   }>;
 };
 
@@ -24,7 +16,7 @@ export function useTopicAnalysis(topicId: string) {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<TopicAnalysis | null>(null);
 
-  const generateAnalysis = useCallback(async () => {
+  const generateAnalysis = useCallback(async (forceRefresh = false) => {
     setAnalysisLoading(true);
     setAnalysisError(null);
 
@@ -32,7 +24,7 @@ export function useTopicAnalysis(topicId: string) {
       const res = await fetch("/api/analysis/topic", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topicId }),
+        body: JSON.stringify({ topicId, forceRefresh }),
       });
 
       const data = await res.json();
@@ -46,6 +38,38 @@ export function useTopicAnalysis(topicId: string) {
     } finally {
       setAnalysisLoading(false);
     }
+  }, [topicId]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadCachedAnalysis = async () => {
+      try {
+        const res = await fetch(`/api/analysis/topic?topicId=${encodeURIComponent(topicId)}`);
+        const data = (await res.json()) as {
+          analysis?: TopicAnalysis | null;
+          error?: string;
+        };
+
+        if (!active || !res.ok) {
+          return;
+        }
+
+        if (data.analysis) {
+          setAnalysisResult(data.analysis);
+        }
+      } catch {
+        // キャッシュ読込失敗時は無視して手動生成にフォールバック
+      }
+    };
+
+    if (topicId) {
+      void loadCachedAnalysis();
+    }
+
+    return () => {
+      active = false;
+    };
   }, [topicId]);
 
   return {

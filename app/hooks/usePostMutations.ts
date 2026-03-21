@@ -123,6 +123,28 @@ export function usePostMutations({
     [triggerEditPost, session, mutatePosts]
   );
 
+  const toggleTopicDeadline = useCallback(
+    (postId: string, deadline: number | null, onSuccess?: () => void) => {
+      triggerEditPost(
+        {
+          postId,
+          deadline,
+        },
+        {
+          onSuccess: () => {
+            mutatePosts();
+            onSuccess?.();
+          },
+          onError: (error) => {
+            console.error("締め切り更新エラー:", error);
+            alert("締め切り更新に失敗しました");
+          },
+        }
+      );
+    },
+    [triggerEditPost, mutatePosts]
+  );
+
   const deletePost = useCallback(
     (postId: string, onSuccess?: () => void) => {
       if (!confirm("本当に削除しますか？")) return;
@@ -147,6 +169,7 @@ export function usePostMutations({
     saveReply,
     isCreatingReply,
     saveEditedPost,
+    toggleTopicDeadline,
     deletePost,
   };
 }

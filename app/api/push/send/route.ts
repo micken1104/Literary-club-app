@@ -108,13 +108,23 @@ export async function GET() {
     const jstOffsetMs = 9 * 60 * 60 * 1000;
     const nowUtcMs = Date.now();
     const nowJst = new Date(nowUtcMs + jstOffsetMs);
+    const nowSec = Math.floor(nowUtcMs / 1000);
+    const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
     const nowJstHour = nowJst.getUTCHours();
     const nowJstMinute = nowJst.getUTCMinutes();
+    const nowJstDay = nowJst.getUTCDay();
 
-    // JST正午にのみ送信（Cronが毎時実行でも誤送信しないようにする）
-    if (nowJstHour !== 12 || nowJstMinute > 10) {
+    // JST正午: 既存の締切通知
+    const shouldRunNoonDeadlinePush = nowJstHour === 12 && nowJstMinute <= 10;
+    // JST月曜00時: 部員紹介AI自動更新
+    const shouldRunMondayMemberAi = nowJstDay === 1 && nowJstHour === 0 && nowJstMinute <= 15;
+
+    if (!shouldRunNoonDeadlinePush && !shouldRunMondayMemberAi) {
       return NextResponse.json({
-        message: "Skipped: not JST noon window",
+        message: "Skipped: not scheduled window",
+        shouldRunNoonDeadlinePush,
+        shouldRunMondayMemberAi,
+        jstDay: nowJstDay,
         jstHour: nowJstHour,
         jstMinute: nowJstMinute,
       });
@@ -133,77 +143,150 @@ export async function GET() {
       return { startUtcMs, endUtcMs };
     };
 
-    const threeDaysRange = getJstDayRange(3);
-    const todayRange = getJstDayRange(0);
+    const resultPayload: Record<string, unknown> = {
+      shouldRunNoonDeadlinePush,
+      shouldRunMondayMemberAi,
+      jstDay: nowJstDay,
+      jstHour: nowJstHour,
+      jstMinute: nowJstMinute,
+    };
 
-    // 締切3日前のお題を取得（JST日付基準）
-    const threeDaysBeforeResult = await db.execute({
-      sql: `SELECT id, title, author, authorEmail, deadline FROM posts
-            WHERE isTopicPost = 1 AND deadline IS NOT NULL
-            AND deadline >= ? AND deadline <= ?`,
-      params: [threeDaysRange.startUtcMs, threeDaysRange.endUtcMs],
-    });
+    if (shouldRunNoonDeadlinePush) {
+      const threeDaysRange = getJstDayRange(3);
+      const todayRange = getJstDayRange(0);
 
-    // 締切当日のお題を取得（JST日付基準）
-    const todayResult = await db.execute({
-      sql: `SELECT id, title, author, authorEmail, deadline FROM posts
-            WHERE isTopicPost = 1 AND deadline IS NOT NULL
-            AND deadline >= ? AND deadline <= ?`,
-      params: [todayRange.startUtcMs, todayRange.endUtcMs],
-    });
-
-    const threeDaysBeforeTopics = (threeDaysBeforeResult.results || []) as Array<{
-      id: string;
-      title: string;
-      authorEmail: string;
-      deadline: number;
-    }>;
-
-    const todayTopics = (todayResult.results || []) as Array<{
-      id: string;
-      title: string;
-      authorEmail: string;
-      deadline: number;
-    }>;
-
-    // 通知を送信する処理
-    const notifications: Array<{ userEmail: string; title: string; body: string; url: string }> = [];
-
-    // 3日前の通知
-    for (const topic of threeDaysBeforeTopics) {
-      notifications.push({
-        userEmail: topic.authorEmail,
-        title: "締め切り3日前",
-        body: `「${topic.title}」の締め切りは ${formatDateTime(topic.deadline)} です`,
-        url: `/topic/${topic.id}`,
+      // 締切3日前のお題を取得（JST日付基準）
+      const threeDaysBeforeResult = await db.execute({
+        sql: `SELECT id, title, author, authorEmail, deadline FROM posts
+              WHERE isTopicPost = 1 AND deadline IS NOT NULL
+              AND deadline >= ? AND deadline <= ?`,
+        params: [threeDaysRange.startUtcMs, threeDaysRange.endUtcMs],
       });
+
+      // 締切当日のお題を取得（JST日付基準）
+      const todayResult = await db.execute({
+        sql: `SELECT id, title, author, authorEmail, deadline FROM posts
+              WHERE isTopicPost = 1 AND deadline IS NOT NULL
+              AND deadline >= ? AND deadline <= ?`,
+        params: [todayRange.startUtcMs, todayRange.endUtcMs],
+      });
+
+      const threeDaysBeforeTopics = (threeDaysBeforeResult.results || []) as Array<{
+        id: string;
+        title: string;
+        authorEmail: string;
+        deadline: number;
+      }>;
+
+      const todayTopics = (todayResult.results || []) as Array<{
+        id: string;
+        title: string;
+        authorEmail: string;
+        deadline: number;
+      }>;
+
+      const notifications: Array<{ userEmail: string; title: string; body: string; url: string }> = [];
+
+      for (const topic of threeDaysBeforeTopics) {
+        notifications.push({
+          userEmail: topic.authorEmail,
+          title: "締め切り3日前",
+          body: `「${topic.title}」の締め切りは ${formatDateTime(topic.deadline)} です`,
+          url: `/topic/${topic.id}`,
+        });
+      }
+
+      for (const topic of todayTopics) {
+        notifications.push({
+          userEmail: topic.authorEmail,
+          title: "締め切り当日",
+          body: `「${topic.title}」の締め切りは本日 ${formatDateTime(topic.deadline)} です`,
+          url: `/topic/${topic.id}`,
+        });
+      }
+
+      for (const notification of notifications) {
+        await fetch(`${baseUrl}/api/push/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(notification),
+        });
+      }
+
+      resultPayload.deadlinePush = {
+        sentCount: notifications.length,
+        threeDaysBefore: threeDaysBeforeTopics.length,
+        today: todayTopics.length,
+      };
     }
 
-    // 当日の通知
-    for (const topic of todayTopics) {
-      notifications.push({
-        userEmail: topic.authorEmail,
-        title: "締め切り当日",
-        body: `「${topic.title}」の締め切りは本日 ${formatDateTime(topic.deadline)} です`,
-        url: `/topic/${topic.id}`,
+    if (shouldRunMondayMemberAi) {
+      const profilesResult = await db.execute({
+        sql: `SELECT email, penName, allowAiRead
+              FROM userProfiles
+              WHERE COALESCE(allowAiRead, 1) = 1`,
       });
+
+      const profiles = (profilesResult.results || []) as Array<{
+        email: string;
+        penName: string;
+      }>;
+
+      let memberUpdatedCount = 0;
+      const memberErrors: string[] = [];
+
+      for (const profile of profiles) {
+        try {
+          const res = await fetch(`${baseUrl}/api/analysis/member`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: profile.email,
+              penName: profile.penName || "部員",
+              autoFetch: true,
+              limit: 10,
+              forceRefresh: true,
+            }),
+          });
+
+          if (!res.ok) {
+            const errorText = await res.text();
+            memberErrors.push(`${profile.email}: ${errorText}`);
+            continue;
+          }
+
+          const data = (await res.json()) as { analysis?: string };
+          const compactSummary = String(data.analysis || "")
+            .replace(/\s+/g, " ")
+            .trim()
+            .slice(0, 75);
+
+          if (!compactSummary) {
+            continue;
+          }
+
+          await db.execute({
+            sql: `UPDATE userProfiles
+                  SET aiSummary = ?,
+                      aiUpdatedAt = ?,
+                      updatedAt = strftime('%s', 'now')
+                  WHERE email = ?`,
+            params: [compactSummary, nowSec, profile.email],
+          });
+          memberUpdatedCount += 1;
+        } catch (error) {
+          memberErrors.push(`${profile.email}: ${error instanceof Error ? error.message : "Unknown error"}`);
+        }
+      }
+
+      resultPayload.weeklyAi = {
+        memberCandidateCount: profiles.length,
+        memberUpdatedCount,
+        memberErrorCount: memberErrors.length,
+      };
     }
 
-    // 各通知を送信
-    for (const notification of notifications) {
-      await fetch(`${process.env.NEXTAUTH_URL}/api/push/send`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(notification),
-      });
-    }
-
-    return NextResponse.json({
-      message: "Deadline notifications processed",
-      sentCount: notifications.length,
-      threeDaysBefore: threeDaysBeforeTopics.length,
-      today: todayTopics.length,
-    });
+    return NextResponse.json(resultPayload);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
