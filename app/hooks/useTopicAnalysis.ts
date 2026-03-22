@@ -51,15 +51,26 @@ export function useTopicAnalysis(topicId: string) {
           error?: string;
         };
 
-        if (!active || !res.ok) {
+        if (!active) {
+          return;
+        }
+
+        if (!res.ok) {
+          setAnalysisError(data?.error || "分析の読込に失敗しました");
           return;
         }
 
         if (data.analysis) {
           setAnalysisResult(data.analysis);
+        } else {
+          // キャッシュが存在しない場合は明示的に null をセット
+          // （フロントエンドが「結果なし」を認識できるようにする）
+          setAnalysisResult(null);
         }
-      } catch {
-        // キャッシュ読込失敗時は無視して手動生成にフォールバック
+      } catch (err) {
+        if (!active) return;
+        // キャッシュ読込失敗時は無視
+        console.error("キャッシュ読込エラー:", err);
       }
     };
 

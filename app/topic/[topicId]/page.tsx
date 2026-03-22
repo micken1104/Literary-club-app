@@ -151,6 +151,20 @@ export default function TopicPage() {
     return Date.now() > deadline;
   };
 
+  // --- 初期ロード時に deadline expired なら分析を自動生成 ---
+  useEffect(() => {
+    if (
+      topic &&
+      topic.isTopicPost === 1 &&
+      isDeadlineExpired(topic.deadline) &&
+      !analysisResult &&
+      !analysisLoading
+    ) {
+      // キャッシュから取得するか、存在しなければ生成
+      void generateAnalysis(false);
+    }
+  }, [topic?.id, analysisResult, analysisLoading, generateAnalysis]);
+
   const handleToggleTopicDeadline = () => {
     if (!topic || topic.isTopicPost !== 1) {
       return;
