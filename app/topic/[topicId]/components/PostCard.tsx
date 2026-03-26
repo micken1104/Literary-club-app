@@ -17,7 +17,7 @@ const postCardStyle = tv({
   base: "p-6",
   variants: {
     theme: {
-      street: "jsr-card bg-white rounded-2xl spray-hover",
+      street: "jsr-card bg-white rounded-2xl",
       chrome: "bg-transparent border-0 border-b border-white/25 rounded-none",
       library: "jsr-card bg-white rounded-2xl",
     },
