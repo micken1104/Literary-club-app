@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const CLOUDFLARE_D1_DATABASE_ID = process.env.CLOUDFLARE_D1_DATABASE_ID;
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
@@ -49,9 +52,23 @@ export async function GET() {
     const url = `https://api.cloudflare.com/client/v4/accounts/${CLOUDFLARE_ACCOUNT_ID}/d1/database/${CLOUDFLARE_D1_DATABASE_ID}/query`;
     const query = await d1Query(
       url,
-      `SELECT email, penName, userIcon, selfIntro, aiSummary, aiTagsJson, aiUpdatedAt, updatedAt
-       FROM userProfiles
-       ORDER BY updatedAt DESC`,
+      `SELECT candidates.email,
+              up.penName,
+              up.userIcon,
+              up.selfIntro,
+              up.aiSummary,
+              up.aiTagsJson,
+              up.aiUpdatedAt,
+              up.updatedAt
+       FROM (
+         SELECT email FROM userProfiles
+         UNION
+         SELECT DISTINCT authorEmail AS email
+         FROM posts
+         WHERE authorEmail IS NOT NULL AND TRIM(authorEmail) <> ''
+       ) AS candidates
+       LEFT JOIN userProfiles up ON up.email = candidates.email
+       ORDER BY COALESCE(up.updatedAt, 0) DESC, candidates.email ASC`,
       []
     );
 
@@ -64,8 +81,12 @@ export async function GET() {
 
     const profiles = (query.data.result[0]?.results || []).map((profile: any) => ({
       email: profile.email,
-      penName: profile.penName,
-      userIcon: profile.userIcon,
+      penName:
+        profile.penName ||
+        (String(profile.email || "").includes("@")
+          ? String(profile.email).split("@")[0]
+          : "部員"),
+      userIcon: profile.userIcon || null,
       selfIntro: profile.selfIntro || "",
       aiSummary: profile.aiSummary || "",
       aiTags: parseAiTags(profile.aiTagsJson),

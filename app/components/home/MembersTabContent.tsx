@@ -142,7 +142,7 @@ export function MembersTabContent() {
                   <div className={memberAiSection({ theme: appTheme })}>
                     <p className="text-xs font-black uppercase text-black chrome:text-white mb-1">AI短文分析</p>
                     <p className="text-sm font-semibold text-black chrome:text-white">
-                      {analysisByMemberKey[member.email] || member.aiSummary || "分析を作成中です..."}
+                      {member.aiSummary || analysisByMemberKey[member.email] || "分析を作成中です..."}
                     </p>
                   </div>
                 )}

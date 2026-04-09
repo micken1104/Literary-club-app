@@ -56,6 +56,7 @@ const MODEL_NAME = "@cf/meta/llama-3-8b-instruct";
 const POST_BODY_LIMIT = 3000;
 const MEMBER_POST_BODY_LIMIT = 1000;
 const MEMBER_POST_LIMIT = 10;
+const MEMBER_SHORT_INTRO_MAX = 20;
 
 const POST_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const WEEKLY_CACHE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
@@ -99,10 +100,13 @@ function toSingleSentence(text: string): string {
   const normalized = String(text || "").replace(/\s+/g, " ").trim();
   if (!normalized) return "";
   const match = normalized.match(/^.+?[。.!?！？]/);
-  if (match && match[0]) {
-    return match[0].trim();
+  const baseSentence = match && match[0] ? match[0].trim() : normalized;
+  const plain = baseSentence.replace(/[。.!?！？]+$/g, "").trim();
+  if (!plain) return "";
+  if (plain.length <= MEMBER_SHORT_INTRO_MAX) {
+    return `${plain}。`;
   }
-  return normalized;
+  return `${plain.slice(0, MEMBER_SHORT_INTRO_MAX).trim()}。`;
 }
 
 function hashInput(value: string): string {

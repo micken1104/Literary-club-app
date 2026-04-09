@@ -24,6 +24,9 @@ import { getMemberPosts } from "@/app/lib/r2Utils";
 import { getD1Client } from "@/app/lib/db";
 import { generateMemberAnalysisWithCache } from "@/app/lib/aiReviewService";
 
+const MEMBER_SUMMARY_MAX_LENGTH = 20;
+const EMPTY_POSTS_ANALYSIS = "まだ投稿データが少ないため、AI分析はこれから表示されます。";
+
 interface MemberAnalysisRequest {
   email?: string;
   penName: string;
@@ -55,13 +58,37 @@ export async function POST(request: NextRequest) {
         posts = await getMemberPosts(db, data.email, data.limit || 10);
 
         if (!posts || posts.length === 0) {
-          return NextResponse.json(
-            {
-              warning: "No posts found for this member",
-              penName: data.penName,
-            },
-            { status: 404 }
-          );
+          const nowSec = Math.floor(Date.now() / 1000);
+          const saveResult = await db.execute({
+            sql: `INSERT INTO userProfiles (email, penName, userIcon, selfIntro, aiSummary, aiTagsJson, aiUpdatedAt, createdAt, updatedAt)
+                  VALUES (?, ?, NULL, '', ?, ?, ?, strftime('%s', 'now'), strftime('%s', 'now'))
+                  ON CONFLICT(email) DO UPDATE SET
+                    penName = COALESCE(NULLIF(userProfiles.penName, ''), excluded.penName),
+                    aiSummary = excluded.aiSummary,
+                    aiTagsJson = excluded.aiTagsJson,
+                    aiUpdatedAt = excluded.aiUpdatedAt,
+                    updatedAt = strftime('%s', 'now')`,
+            params: [
+              data.email,
+              data.penName || "部員",
+              EMPTY_POSTS_ANALYSIS,
+              JSON.stringify(["#投稿準備中", "#文芸部", "#部員紹介"]),
+              nowSec,
+            ],
+          });
+
+          if (!saveResult.success) {
+            console.error("Failed to save empty-post analysis:", saveResult.error);
+          }
+
+          return NextResponse.json({
+            penName: data.penName,
+            email: data.email,
+            analysis: EMPTY_POSTS_ANALYSIS,
+            fromCache: false,
+            postsAnalyzed: 0,
+            generatedAt: new Date().toISOString(),
+          });
         }
 
         console.log(`✅ Fetched ${posts.length} posts for analysis`);
@@ -76,10 +103,14 @@ export async function POST(request: NextRequest) {
 
     // 投稿データの検証
     if (!posts || posts.length === 0) {
-      return NextResponse.json(
-        { error: "No posts provided or found" },
-        { status: 400 }
-      );
+      return NextResponse.json({
+        penName: data.penName,
+        email: data.email || null,
+        analysis: EMPTY_POSTS_ANALYSIS,
+        fromCache: false,
+        postsAnalyzed: 0,
+        generatedAt: new Date().toISOString(),
+      });
     }
 
     // 本文のサイズチェック
@@ -122,20 +153,22 @@ export async function POST(request: NextRequest) {
     const tagsJson = JSON.stringify(finalTags.map(tag => `#${tag.slice(0, 12)}`));
 
     if (data.email && result.text && result.text.trim().length > 0) {
-      const summary = String(result.text).replace(/\s+/g, " ").trim().slice(0, 500);
+      const summary = String(result.text).replace(/\s+/g, " ").trim().slice(0, MEMBER_SUMMARY_MAX_LENGTH);
       console.log(`💾 Saving analysis for ${data.email}: ${summary.slice(0, 30)}...`);
       console.log(`📌 Saving tags: ${tagsJson}`);
       const nowSec = Math.floor(Date.now() / 1000);
       
       try {
         const updateRes = await db.execute({
-          sql: `UPDATE userProfiles
-                SET aiSummary = ?,
-                    aiTagsJson = ?,
-                    aiUpdatedAt = ?,
-                    updatedAt = strftime('%s', 'now')
-                WHERE email = ?`,
-          params: [summary, tagsJson, nowSec, data.email],
+          sql: `INSERT INTO userProfiles (email, penName, userIcon, selfIntro, aiSummary, aiTagsJson, aiUpdatedAt, createdAt, updatedAt)
+                VALUES (?, ?, NULL, '', ?, ?, ?, strftime('%s', 'now'), strftime('%s', 'now'))
+                ON CONFLICT(email) DO UPDATE SET
+                  penName = COALESCE(NULLIF(userProfiles.penName, ''), excluded.penName),
+                  aiSummary = excluded.aiSummary,
+                  aiTagsJson = excluded.aiTagsJson,
+                  aiUpdatedAt = excluded.aiUpdatedAt,
+                  updatedAt = strftime('%s', 'now')`,
+          params: [data.email, data.penName || "部員", summary, tagsJson, nowSec],
         });
         console.log(`✅ DB update result:`, updateRes);
       } catch (e) {

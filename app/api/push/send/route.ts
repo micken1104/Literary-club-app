@@ -6,6 +6,7 @@ import webpush from "web-push";
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || "mailto:admin@example.com";
+const MEMBER_SUMMARY_MAX_LENGTH = 20;
 
 // プッシュ通知を送信（Cloudflare Workers Cronから呼ばれる想定）
 export async function POST(request: Request) {
@@ -109,6 +110,7 @@ export async function GET() {
     const nowUtcMs = Date.now();
     const nowJst = new Date(nowUtcMs + jstOffsetMs);
     const nowSec = Math.floor(nowUtcMs / 1000);
+    const mondayRefreshThresholdSec = nowSec - 6 * 24 * 60 * 60;
     const baseUrl = process.env.NEXTAUTH_URL || "http://localhost:3000";
     const nowJstHour = nowJst.getUTCHours();
     const nowJstMinute = nowJst.getUTCMinutes();
@@ -116,8 +118,8 @@ export async function GET() {
 
     // JST正午: 既存の締切通知
     const shouldRunNoonDeadlinePush = nowJstHour === 12 && nowJstMinute <= 10;
-    // JST月曜00時: 部員紹介AI自動更新
-    const shouldRunMondayMemberAi = nowJstDay === 1 && nowJstHour === 0 && nowJstMinute <= 15;
+    // JST月曜00時台: 部員紹介AI自動更新（minute driftを吸収）
+    const shouldRunMondayMemberAi = nowJstDay === 1 && nowJstHour === 0;
 
     if (!shouldRunNoonDeadlinePush && !shouldRunMondayMemberAi) {
       return NextResponse.json({
@@ -222,9 +224,21 @@ export async function GET() {
 
     if (shouldRunMondayMemberAi) {
       const profilesResult = await db.execute({
-        sql: `SELECT email, penName, allowAiRead
-              FROM userProfiles
-              WHERE COALESCE(allowAiRead, 1) = 1`,
+        sql: `SELECT candidates.email,
+                     up.penName,
+                     COALESCE(up.allowAiRead, 1) AS allowAiRead
+              FROM (
+                SELECT email FROM userProfiles
+                UNION
+                SELECT DISTINCT authorEmail AS email
+                FROM posts
+                WHERE authorEmail IS NOT NULL AND TRIM(authorEmail) <> ''
+              ) AS candidates
+              LEFT JOIN userProfiles up ON up.email = candidates.email
+              WHERE COALESCE(up.allowAiRead, 1) = 1
+                AND COALESCE(up.aiUpdatedAt, 0) < ?
+              ORDER BY COALESCE(up.updatedAt, 0) DESC, candidates.email ASC`,
+        params: [mondayRefreshThresholdSec],
       });
 
       const profiles = (profilesResult.results || []) as Array<{
@@ -259,20 +273,50 @@ export async function GET() {
           const compactSummary = String(data.analysis || "")
             .replace(/\s+/g, " ")
             .trim()
-            .slice(0, 75);
+            .slice(0, MEMBER_SUMMARY_MAX_LENGTH);
 
           if (!compactSummary) {
             continue;
           }
 
-          await db.execute({
-            sql: `UPDATE userProfiles
-                  SET aiSummary = ?,
-                      aiUpdatedAt = ?,
-                      updatedAt = strftime('%s', 'now')
-                  WHERE email = ?`,
-            params: [compactSummary, nowSec, profile.email],
+          let saveResult = await db.execute({
+            sql: `INSERT INTO userProfiles (email, penName, userIcon, selfIntro, aiSummary, aiUpdatedAt, allowAiRead, createdAt, updatedAt)
+                  VALUES (?, ?, NULL, '', ?, ?, 1, strftime('%s', 'now'), strftime('%s', 'now'))
+                  ON CONFLICT(email) DO UPDATE SET
+                    penName = COALESCE(NULLIF(userProfiles.penName, ''), excluded.penName),
+                    aiSummary = excluded.aiSummary,
+                    aiUpdatedAt = excluded.aiUpdatedAt,
+                    updatedAt = strftime('%s', 'now')`,
+            params: [
+              profile.email,
+              profile.penName || (profile.email?.split("@")[0] || "部員"),
+              compactSummary,
+              nowSec,
+            ],
           });
+
+          if (!saveResult.success) {
+            saveResult = await db.execute({
+              sql: `INSERT INTO userProfiles (email, penName, userIcon, selfIntro, aiSummary, aiUpdatedAt, createdAt, updatedAt)
+                    VALUES (?, ?, NULL, '', ?, ?, strftime('%s', 'now'), strftime('%s', 'now'))
+                    ON CONFLICT(email) DO UPDATE SET
+                      penName = COALESCE(NULLIF(userProfiles.penName, ''), excluded.penName),
+                      aiSummary = excluded.aiSummary,
+                      aiUpdatedAt = excluded.aiUpdatedAt,
+                      updatedAt = strftime('%s', 'now')`,
+              params: [
+                profile.email,
+                profile.penName || (profile.email?.split("@")[0] || "部員"),
+                compactSummary,
+                nowSec,
+              ],
+            });
+          }
+
+          if (!saveResult.success) {
+            memberErrors.push(`${profile.email}: ${String(saveResult.error || "Failed to save aiSummary")}`);
+            continue;
+          }
           memberUpdatedCount += 1;
         } catch (error) {
           memberErrors.push(`${profile.email}: ${error instanceof Error ? error.message : "Unknown error"}`);
