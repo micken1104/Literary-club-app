@@ -1,12 +1,13 @@
 # Literary Club Portal
 
-文学部向けの投稿アプリです。お題投稿、作品投稿、コメント、いいね、プロフィール設定を提供します。
+文学部向けの投稿アプリです。お題投稿、作品投稿、コメント、いいね、プロフィール設定に加えて、AI 講評・週次総括・部員分析を提供します。
 
 ## 構成
 
 - フロントエンド: Next.js 16 + HeroUI
 - 認証: NextAuth (Google ログイン)
 - データベース: Cloudflare D1 (SQLite)
+- AI: Cloudflare Workers AI
 - ホスティング: Cloudflare Pages
 - PWA: Service Worker / オフライン対応 / 追加可能
 - 通知: 締め切りリマインダー (プッシュ通知)
@@ -20,6 +21,7 @@
 - ペンネーム、ユーザーアイコン設定
 - ライト/ダーク/システムテーマ切り替え
 - 締め切り設定、締め切り後投稿制限
+- AI 講評、週次総括、部員プロフィール分析
 
 ## ローカル開発
 
@@ -33,15 +35,16 @@ npm run dev
 
 ## 環境変数
 
-### AI講評 (Hugging Face)
+### AI講評 (Cloudflare Workers AI)
 
 ```bash
-HUGGINGFACE_API_TOKEN=your_hf_token
-HUGGINGFACE_MODEL=mistralai/Mistral-7B-Instruct-v0.2
-HUGGINGFACE_BASE_URL=https://api-inference.huggingface.co/models
+CLOUDFLARE_ACCOUNT_ID=your_account_id
+CLOUDFLARE_AI_API_TOKEN=your_ai_token
+# 互換用の環境変数名も利用できます
+CLOUDFLARE_API_TOKEN=your_ai_token
 ```
 
-`HUGGINGFACE_BASE_URL` は通常変更不要です。
+`CLOUDFLARE_AI_API_TOKEN` が優先され、`CLOUDFLARE_API_TOKEN` も互換用に利用できます。
 
 ### アイコン保存 (Cloudflare R2)
 
@@ -74,6 +77,8 @@ git push origin main
 ## ドキュメント
 
 - `DEPLOYMENT_GUIDE.md`: デプロイ手順
+- `AI_REVIEW_IMPLEMENTATION_GUIDE.md`: AI 講評システムの実装ガイド
+- `CLOUDFLARE_AI_IMPLEMENTATION_SUMMARY.md`: AI 機能の実装サマリー
 - `MIGRATION_SUMMARY.md`: DynamoDB から D1 への移行内容
 - `PWA_ICON_SETUP.md`: PWA アイコン設定
 
