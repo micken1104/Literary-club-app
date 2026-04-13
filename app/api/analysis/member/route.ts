@@ -22,10 +22,14 @@
 import { NextResponse, NextRequest } from "next/server";
 import { getMemberPosts } from "@/app/lib/r2Utils";
 import { getD1Client } from "@/app/lib/db";
-import { generateMemberAnalysisWithCache } from "@/app/lib/aiReviewService";
+import {
+  generateMemberAnalysisWithCache,
+  generateMemberTagsWithCache,
+} from "@/app/lib/aiReviewService";
 
-const MEMBER_SUMMARY_MAX_LENGTH = 20;
+const MEMBER_SUMMARY_MAX_LENGTH = 120;
 const EMPTY_POSTS_ANALYSIS = "まだ投稿データが少ないため、AI分析はこれから表示されます。";
+const MEMBER_ANALYSIS_VERSION = "v2-tags-pool";
 
 interface MemberAnalysisRequest {
   email?: string;
@@ -38,6 +42,7 @@ interface MemberAnalysisRequest {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log(`🚀 /api/analysis/member version: ${MEMBER_ANALYSIS_VERSION}`);
     const data: MemberAnalysisRequest = await request.json();
 
     if (!data.penName) {
@@ -133,24 +138,15 @@ export async function POST(request: NextRequest) {
       forceRefresh: Boolean(data.forceRefresh),
     });
 
-    // タグの集計
-    const tagCounts: Record<string, number> = {};
-    posts?.forEach((post) => {
-      const tag = String(post.tag || "創作").trim() || "創作";
-      tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+    const tagsResult = await generateMemberTagsWithCache(db, {
+      memberKey,
+      penName: data.penName,
+      posts: processedPosts,
+      forceRefresh: Boolean(data.forceRefresh),
     });
 
-    const sortedTags = Object.entries(tagCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([tag]) => tag);
-
-    // デフォルト: 投稿集計タグ + 文芸部
-    const finalTags = sortedTags.length > 0
-      ? sortedTags.concat(["文芸部"]).slice(0, 3)
-      : ["創作", "文芸部", "投稿傾向"];
-
-    const tagsJson = JSON.stringify(finalTags.map(tag => `#${tag.slice(0, 12)}`));
+    const finalTags = tagsResult.tags;
+    const tagsJson = JSON.stringify(finalTags);
 
     if (data.email && result.text && result.text.trim().length > 0) {
       const summary = String(result.text).replace(/\s+/g, " ").trim().slice(0, MEMBER_SUMMARY_MAX_LENGTH);
@@ -185,6 +181,8 @@ export async function POST(request: NextRequest) {
       email: data.email || null,
       analysis: result.text,
       fromCache: result.fromCache,
+      aiTags: finalTags,
+      tagsFromCache: tagsResult.fromCache,
       postsAnalyzed: processedPosts.length,
       generatedAt: new Date().toISOString(),
     });

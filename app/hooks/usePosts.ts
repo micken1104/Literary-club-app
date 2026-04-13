@@ -84,10 +84,32 @@ export function usePosts() {
 
   const memberProfiles: MemberProfile[] = useMemo(() => {
     if (!memberProfilesData) return [];
-    return Array.isArray(memberProfilesData.profiles)
-      ? memberProfilesData.profiles
+    const profiles = Array.isArray(memberProfilesData.profiles)
+      ? [...memberProfilesData.profiles]
       : [];
-  }, [memberProfilesData]);
+
+    const posts = Array.isArray(allPostsData) ? allPostsData : [];
+    const postCountByEmail = new Map<string, number>();
+
+    posts.forEach((post) => {
+      const email = String(post.authorEmail || "").trim();
+      if (!email) return;
+      if (post.isTopicPost === 1) return;
+      if (post.tag === "お題案") return;
+      postCountByEmail.set(email, (postCountByEmail.get(email) || 0) + 1);
+    });
+
+    profiles.sort((a, b) => {
+      const countA = postCountByEmail.get(a.email) || 0;
+      const countB = postCountByEmail.get(b.email) || 0;
+      if (countA !== countB) {
+        return countB - countA;
+      }
+      return String(a.penName || a.email).localeCompare(String(b.penName || b.email), "ja");
+    });
+
+    return profiles;
+  }, [memberProfilesData, allPostsData]);
 
   const getDisplayName = (
     authorEmail: string | null | undefined,

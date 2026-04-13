@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import { ensureDefaultUserIcon } from "@/app/lib/defaultIcon";
 
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const CLOUDFLARE_D1_DATABASE_ID = process.env.CLOUDFLARE_D1_DATABASE_ID;
@@ -142,10 +143,24 @@ export async function GET() {
 
     const profile = result.results[0] || null;
     const aiTags = profile?.aiTagsJson ? JSON.parse(profile.aiTagsJson) : [];
+    let userIcon = profile?.userIcon || null;
+
+    if (!userIcon && session.user.email) {
+      const defaultUserIcon = await ensureDefaultUserIcon(session.user.email);
+      if (defaultUserIcon) {
+        userIcon = defaultUserIcon;
+
+        await d1Query(
+          url,
+          "UPDATE userProfiles SET userIcon = ?, updatedAt = strftime('%s', 'now') WHERE email = ?",
+          [defaultUserIcon, session.user.email]
+        );
+      }
+    }
 
     return NextResponse.json({
       penName: profile?.penName || null,
-      userIcon: profile?.userIcon || null,
+      userIcon,
       selfIntro: profile?.selfIntro || "",
       aiSummary: profile?.aiSummary || "",
       aiTags: Array.isArray(aiTags) ? aiTags : [],
@@ -234,7 +249,10 @@ export async function POST(request: Request) {
     const finalPenName = hasPenName
       ? String(penName).trim()
       : (current?.penName || session.user.name || "匿名部員");
-    const finalUserIcon = hasUserIcon ? (userIcon || null) : (current?.userIcon || null);
+    let finalUserIcon = hasUserIcon ? (userIcon || null) : (current?.userIcon || null);
+    if (!finalUserIcon) {
+      finalUserIcon = await ensureDefaultUserIcon(session.user.email);
+    }
     const finalSelfIntro = hasSelfIntro ? String(selfIntro || "").trim() : (current?.selfIntro || "");
     const finalAllowAiRead = hasAllowAiRead
       ? (allowAiRead ? 1 : 0)

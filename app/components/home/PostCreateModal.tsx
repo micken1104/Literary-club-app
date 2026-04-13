@@ -8,7 +8,7 @@ import { HandDrawnPostIcon } from "@/app/components/HandDrawnIcons";
 import { usePosts } from "@/app/hooks/usePosts";
 import { useUserProfile } from "@/app/hooks/useUserProfile";
 import { useCreatePost } from "@/app/hooks/useCreatePost";
-import { parseFile } from "@/app/lib/fileParser";
+import { parseFile, parsePastedText } from "@/app/lib/fileParser";
 import type { Post } from "@/app/types/post";
 
 type PostCreateModalProps = {
@@ -28,12 +28,14 @@ export function PostCreateModal({ isOpen, onClose }: PostCreateModalProps) {
 
   const [newPost, setNewPost] = useState<Partial<Post>>({ title: "", body: "", tag: "創作" });
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [pastedText, setPastedText] = useState("");
 
   if (!isOpen) return null;
 
   const handleClose = () => {
     setNewPost({ title: "", body: "", tag: "創作" });
     setSelectedTopicId(null);
+    setPastedText("");
     onClose();
   };
 
@@ -72,6 +74,7 @@ export function PostCreateModal({ isOpen, onClose }: PostCreateModalProps) {
           alert("投稿しました！");
           setNewPost({ title: "", body: "", tag: "創作" });
           setSelectedTopicId(null);
+          setPastedText("");
           onClose();
         },
         onError: () => {
@@ -81,13 +84,27 @@ export function PostCreateModal({ isOpen, onClose }: PostCreateModalProps) {
     );
   };
 
+  const handleApplyPastedText = () => {
+    const parsed = parsePastedText(pastedText);
+    if (!parsed.title && !parsed.body) {
+      alert("貼り付けテキストが空です");
+      return;
+    }
+
+    setNewPost((prev) => ({
+      ...prev,
+      title: parsed.title || prev.title || "",
+      body: parsed.body || prev.body || "",
+    }));
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
       onClick={handleClose}
     >
       <div
-        className="bg-white rounded-2xl border-4 border-white shadow-street-hard-lg-hover max-w-2xl w-full"
+        className="bg-white rounded-2xl border-4 border-white shadow-street-hard-lg-hover max-w-2xl w-full max-h-[90vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ヘッダー */}
@@ -105,7 +122,7 @@ export function PostCreateModal({ isOpen, onClose }: PostCreateModalProps) {
         </div>
 
         {/* ボディ */}
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 overflow-y-auto">
           <div>
             <label className="block text-sm font-semibold mb-2">投稿先</label>
             <select
@@ -138,6 +155,26 @@ export function PostCreateModal({ isOpen, onClose }: PostCreateModalProps) {
                 <p className="text-xs font-bold">ファイルを解析中...</p>
               </div>
             )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold mb-2">テキストを貼り付けて読み込み（任意）</label>
+            <textarea
+              placeholder="1行目をタイトル、2行目以降を本文として取り込みます"
+              value={pastedText}
+              onChange={(e) => setPastedText(e.target.value)}
+              rows={4}
+              className="w-full border border-gray-300 chrome:border-slate-600 rounded-lg px-3 py-2 bg-white chrome:bg-slate-800 text-slate-900 chrome:text-slate-100"
+            />
+            <div className="mt-2 flex justify-end">
+              <button
+                type="button"
+                onClick={handleApplyPastedText}
+                className="px-4 py-2 text-sm font-bold uppercase bg-cyan-300 text-black border-2 border-black rounded-lg shadow-street-hard hover:translate-y-[-2px] hover:shadow-street-hard-hover transition-all"
+              >
+                貼り付け内容を反映
+              </button>
+            </div>
           </div>
 
           <div>

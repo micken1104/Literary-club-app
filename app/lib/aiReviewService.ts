@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
 import type { D1Client } from "@/app/lib/db";
-import { getAIClient } from "@/app/lib/ai";
+import { getAIClient, MEMBER_HASHTAG_POOL } from "@/app/lib/ai";
 import { getTextFromR2 } from "@/app/lib/r2Utils";
 
-type CacheType = "post_review" | "weekly_summary" | "member_profile";
+type CacheType = "post_review" | "weekly_summary" | "member_profile" | "member_tags";
 
 type CacheRecord = {
   resultText: string;
@@ -45,6 +45,13 @@ type GenerateMemberAnalysisParams = {
   forceRefresh?: boolean;
 };
 
+type GenerateMemberTagsParams = {
+  memberKey: string;
+  penName: string;
+  posts: MemberPost[];
+  forceRefresh?: boolean;
+};
+
 type CachedResult = {
   text: string;
   fromCache: boolean;
@@ -56,11 +63,12 @@ const MODEL_NAME = "@cf/meta/llama-3-8b-instruct";
 const POST_BODY_LIMIT = 3000;
 const MEMBER_POST_BODY_LIMIT = 1000;
 const MEMBER_POST_LIMIT = 10;
-const MEMBER_SHORT_INTRO_MAX = 20;
+const MEMBER_SHORT_INTRO_MAX = 80;
 
 const POST_CACHE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 const WEEKLY_CACHE_TTL_MS = 3 * 24 * 60 * 60 * 1000;
 const MEMBER_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const MEMBER_HASHTAG_SET = new Set<string>(MEMBER_HASHTAG_POOL);
 
 const STOPWORDS = new Set([
   "こと",
@@ -107,6 +115,43 @@ function toSingleSentence(text: string): string {
     return `${plain}。`;
   }
   return `${plain.slice(0, MEMBER_SHORT_INTRO_MAX).trim()}。`;
+}
+
+function normalizeTagText(text: string): string {
+  return String(text || "").replace(/\s+/g, " ").trim();
+}
+
+function parseMemberTags(raw: string): string[] {
+  const cleaned = String(raw || "").replace(/```json|```/g, "").trim();
+  const jsonText = cleaned.match(/\[[\s\S]*\]/)?.[0] ?? cleaned;
+
+  try {
+    const parsed = JSON.parse(jsonText);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    const tags: string[] = [];
+    for (const item of parsed) {
+      if (typeof item !== "string") {
+        continue;
+      }
+
+      const normalized = normalizeTagText(item);
+      if (
+        normalized &&
+        normalized.startsWith("#") &&
+        MEMBER_HASHTAG_SET.has(normalized) &&
+        !tags.includes(normalized)
+      ) {
+        tags.push(normalized);
+      }
+    }
+
+    return tags.slice(0, 3);
+  } catch {
+    return [];
+  }
 }
 
 function hashInput(value: string): string {
@@ -231,6 +276,19 @@ async function upsertCache(
       expiresAt,
     ],
   });
+}
+
+async function getMemberTagsCache(
+  db: D1Client,
+  memberKey: string,
+  inputHash: string
+): Promise<CacheRecord | null> {
+  const cached = await getCache(db, "member_tags", memberKey, inputHash, MEMBER_CACHE_TTL_MS);
+  if (!cached || !cached.resultText.trim()) {
+    return null;
+  }
+
+  return cached;
 }
 
 async function resolvePostBody(params: GeneratePostReviewParams): Promise<string> {
@@ -377,6 +435,82 @@ export async function generateMemberAnalysisWithCache(
   }
 
   return { text: singleSentenceText, fromCache: false };
+}
+
+export async function generateMemberTagsWithCache(
+  db: D1Client,
+  params: GenerateMemberTagsParams
+): Promise<{ tags: string[]; fromCache: boolean }> {
+  const normalizedPosts = params.posts
+    .slice(0, MEMBER_POST_LIMIT)
+    .map((post) => ({
+      title: post.title,
+      body: clampText(post.body, MEMBER_POST_BODY_LIMIT),
+      tag: post.tag || "一般",
+    }));
+
+  const inputHash = hashInput(
+    JSON.stringify({ penName: params.penName, posts: normalizedPosts })
+  );
+
+  if (!params.forceRefresh) {
+    const cached = await getMemberTagsCache(db, params.memberKey, inputHash);
+    if (cached) {
+      const tags = parseMemberTags(cached.resultText);
+      if (tags.length === 3) {
+        return { tags, fromCache: true };
+      }
+    }
+  }
+
+  const ai = getAIClient();
+  const raw = await ai.generateMemberHashtags(params.penName, normalizedPosts);
+  const tags = parseMemberTags(raw);
+
+  if (tags.length === 3) {
+    await upsertCache(
+      db,
+      "member_tags",
+      params.memberKey,
+      inputHash,
+      JSON.stringify(tags),
+      MEMBER_CACHE_TTL_MS
+    );
+    return { tags, fromCache: false };
+  }
+
+  const fallbackTags = normalizedPosts
+    .slice(0, 3)
+    .map((post) => `#${normalizeTagText(post.tag || "創作").replace(/^#+/, "")}`)
+    .filter(
+      (tag, index, tagsList) =>
+        tag.length > 1 &&
+        MEMBER_HASHTAG_SET.has(tag) &&
+        tagsList.indexOf(tag) === index
+    )
+    .slice(0, 3);
+
+  while (fallbackTags.length < 3) {
+    const fillers = ["#純文学", "#心理描写", "#日常", "#孤独", "#再生"];
+    const next = fillers.find((tag) => !fallbackTags.includes(tag));
+    if (!next) {
+      break;
+    }
+    fallbackTags.push(next);
+  }
+
+  const finalTags = fallbackTags.slice(0, 3);
+
+  await upsertCache(
+    db,
+    "member_tags",
+    params.memberKey,
+    inputHash,
+    JSON.stringify(finalTags),
+    MEMBER_CACHE_TTL_MS
+  );
+
+  return { tags: finalTags, fromCache: false };
 }
 
 export function buildWeeklyAggregate(posts: Array<{ title: string; body: string; tag?: string }>): WeeklyAggregateInput {

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { ensureDefaultUserIcon } from "@/app/lib/defaultIcon";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -6,6 +7,7 @@ export const revalidate = 0;
 const CLOUDFLARE_ACCOUNT_ID = process.env.CLOUDFLARE_ACCOUNT_ID;
 const CLOUDFLARE_D1_DATABASE_ID = process.env.CLOUDFLARE_D1_DATABASE_ID;
 const CLOUDFLARE_API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
+const EMPTY_POSTS_ANALYSIS = "まだ投稿データが少ないため、AI分析はこれから表示されます。";
 
 function parseAiTags(value: string | null | undefined): string[] {
   if (!value) return [];
@@ -59,7 +61,14 @@ export async function GET() {
               up.aiSummary,
               up.aiTagsJson,
               up.aiUpdatedAt,
-              up.updatedAt
+              up.updatedAt,
+              (
+                SELECT COUNT(*)
+                FROM posts p
+                WHERE p.authorEmail = candidates.email
+                  AND COALESCE(p.isTopicPost, 0) = 0
+                  AND COALESCE(p.tag, '') != 'お題案'
+              ) AS postCount
        FROM (
          SELECT email FROM userProfiles
          UNION
@@ -79,19 +88,40 @@ export async function GET() {
       );
     }
 
-    const profiles = (query.data.result[0]?.results || []).map((profile: any) => ({
-      email: profile.email,
-      penName:
-        profile.penName ||
-        (String(profile.email || "").includes("@")
-          ? String(profile.email).split("@")[0]
-          : "部員"),
-      userIcon: profile.userIcon || null,
-      selfIntro: profile.selfIntro || "",
-      aiSummary: profile.aiSummary || "",
-      aiTags: parseAiTags(profile.aiTagsJson),
-      aiUpdatedAt: Number(profile.aiUpdatedAt || 0),
-      updatedAt: Number(profile.updatedAt || 0),
+    const rawProfiles = query.data.result[0]?.results || [];
+    const profiles = await Promise.all(rawProfiles.map(async (profile: any) => {
+      let userIcon = profile.userIcon || null;
+
+      if (!userIcon && profile.email) {
+        const defaultUserIcon = await ensureDefaultUserIcon(profile.email);
+        if (defaultUserIcon) {
+          userIcon = defaultUserIcon;
+
+          await d1Query(
+            url,
+            "UPDATE userProfiles SET userIcon = ?, updatedAt = strftime('%s', 'now') WHERE email = ?",
+            [defaultUserIcon, profile.email]
+          );
+        }
+      }
+
+      return {
+        email: profile.email,
+        penName:
+          profile.penName ||
+          (String(profile.email || "").includes("@")
+            ? String(profile.email).split("@")[0]
+            : "部員"),
+        userIcon,
+        selfIntro: profile.selfIntro || "",
+        aiSummary: Number(profile.postCount || 0) === 0 ? EMPTY_POSTS_ANALYSIS : (profile.aiSummary || ""),
+        aiTags:
+          Number(profile.postCount || 0) === 0
+            ? ["#投稿準備中", "#文芸部", "#部員紹介"]
+            : parseAiTags(profile.aiTagsJson),
+        aiUpdatedAt: Number(profile.aiUpdatedAt || 0),
+        updatedAt: Number(profile.updatedAt || 0),
+      };
     }));
 
     return NextResponse.json({ profiles });
@@ -128,7 +158,28 @@ export async function POST(request: Request) {
       );
     }
 
-    const profiles = query.data.result[0]?.results || [];
+    const rawProfiles = query.data.result[0]?.results || [];
+    const profiles = await Promise.all(rawProfiles.map(async (profile: any) => {
+      let userIcon = profile.userIcon || null;
+
+      if (!userIcon && profile.email) {
+        const defaultUserIcon = await ensureDefaultUserIcon(profile.email);
+        if (defaultUserIcon) {
+          userIcon = defaultUserIcon;
+
+          await d1Query(
+            url,
+            "UPDATE userProfiles SET userIcon = ?, updatedAt = strftime('%s', 'now') WHERE email = ?",
+            [defaultUserIcon, profile.email]
+          );
+        }
+      }
+
+      return {
+        ...profile,
+        userIcon,
+      };
+    }));
 
     const penNameMap: { [key: string]: string } = {};
     const userIconMap: { [key: string]: string } = {};
@@ -137,16 +188,16 @@ export async function POST(request: Request) {
     const aiTagsMap: { [key: string]: string[] } = {};
     const aiUpdatedAtMap: { [key: string]: number } = {};
 
-    profiles.forEach((profile: any) => {
+    for (const profile of profiles as Array<{ email: string; penName: string; userIcon: string | null; selfIntro: string; aiSummary: string; aiTagsJson?: string; aiUpdatedAt: number }>) {
       penNameMap[profile.email] = profile.penName || "";
       if (profile.userIcon) {
         userIconMap[profile.email] = profile.userIcon;
       }
       selfIntroMap[profile.email] = profile.selfIntro || "";
       aiSummaryMap[profile.email] = profile.aiSummary || "";
-      aiTagsMap[profile.email] = parseAiTags(profile.aiTagsJson);
+      aiTagsMap[profile.email] = parseAiTags((profile as { aiTagsJson?: string }).aiTagsJson);
       aiUpdatedAtMap[profile.email] = Number(profile.aiUpdatedAt || 0);
-    });
+    }
 
     return NextResponse.json({
       penNameMap,

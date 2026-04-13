@@ -48,6 +48,7 @@ export function MembersTabContent() {
 
   const [aiReadingEnabled, setAiReadingEnabled] = useState(true);
   const [analysisByMemberKey, setAnalysisByMemberKey] = useState<Record<string, string>>({});
+  const [tagsByMemberKey, setTagsByMemberKey] = useState<Record<string, string[]>>({});
   const requestedEmailsRef = useRef<Set<string>>(new Set());
   const { analyze } = useMemberAnalysis();
 
@@ -58,7 +59,12 @@ export function MembersTabContent() {
         return;
       }
 
-      if (member.aiSummary && member.aiSummary.trim().length > 0) {
+      if (
+        member.aiSummary &&
+        member.aiSummary.trim().length > 0 &&
+        Array.isArray(member.aiTags) &&
+        member.aiTags.length > 0
+      ) {
         return;
       }
 
@@ -72,13 +78,19 @@ export function MembersTabContent() {
       })
         .then((result) => {
           const analysis = (result as { analysis?: string } | undefined)?.analysis;
-          if (!analysis) {
-            return;
+          const aiTags = (result as { aiTags?: string[] } | undefined)?.aiTags;
+          if (analysis) {
+            setAnalysisByMemberKey((prev) => ({
+              ...prev,
+              [email]: analysis,
+            }));
           }
-          setAnalysisByMemberKey((prev) => ({
-            ...prev,
-            [email]: analysis,
-          }));
+          if (aiTags && aiTags.length > 0) {
+            setTagsByMemberKey((prev) => ({
+              ...prev,
+              [email]: aiTags.slice(0, 3),
+            }));
+          }
         })
         .catch(() => {
           // 失敗時は既存表示（プレースホルダ）を使う
@@ -111,9 +123,9 @@ export function MembersTabContent() {
           const iconUrl = getMemberIcon(member.email);
           const fallbackName = member.email ? member.email.split("@")[0] : "匿名部員";
           const displayName = member.penName || fallbackName;
-          const displayTags = Array.isArray(member.aiTags) && member.aiTags.length > 0
+          const displayTags = tagsByMemberKey[member.email] || (Array.isArray(member.aiTags) && member.aiTags.length > 0
             ? member.aiTags.slice(0, 3)
-            : ["#文芸部", "#創作", "#部員紹介"];
+            : ["#文芸部", "#創作", "#部員紹介"]);
 
           return (
             <Card key={member.email} shadow="none" theme={appTheme}

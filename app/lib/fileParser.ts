@@ -3,6 +3,28 @@ export type ParseResult = {
   body: string;
 };
 
+export function parsePastedText(input: string): ParseResult {
+  const normalized = String(input || "").replace(/\r\n?/g, "\n").trim();
+  if (!normalized) {
+    return { title: "", body: "" };
+  }
+
+  const lines = normalized.split("\n").map((line) => line.trim());
+  const firstNonEmptyIndex = lines.findIndex((line) => line.length > 0);
+
+  if (firstNonEmptyIndex === -1) {
+    return { title: "", body: "" };
+  }
+
+  const title = lines[firstNonEmptyIndex] || "無題";
+  const body = lines.slice(firstNonEmptyIndex + 1).join("\n").trim();
+
+  return {
+    title,
+    body: body || normalized,
+  };
+}
+
 export async function parseFile(file: File): Promise<ParseResult> {
   const title = file.name.replace(/\.[^/.]+$/, "");
 

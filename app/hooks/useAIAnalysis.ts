@@ -189,6 +189,7 @@ export function useMemberAnalysis() {
     isAnalyzing: isMutating,
     error: error?.message,
     analysis: data?.analysis,
+    aiTags: data?.aiTags,
     postsAnalyzed: data?.postsAnalyzed,
   };
 }

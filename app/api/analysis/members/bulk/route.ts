@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { getD1Client } from "@/app/lib/db";
 import { getMemberPosts } from "@/app/lib/r2Utils";
-import { generateMemberAnalysisWithCache } from "@/app/lib/aiReviewService";
+import {
+  generateMemberAnalysisWithCache,
+  generateMemberTagsWithCache,
+} from "@/app/lib/aiReviewService";
 
-const MEMBER_SUMMARY_MAX_LENGTH = 20;
+const MEMBER_SUMMARY_MAX_LENGTH = 120;
 const EMPTY_POSTS_ANALYSIS = "まだ投稿データが少ないため、AI分析はこれから表示されます。";
 
 export async function POST() {
@@ -116,6 +119,17 @@ export async function POST() {
           forceRefresh: true,
         });
 
+        const tagsResult = await generateMemberTagsWithCache(db, {
+          memberKey: email,
+          penName,
+          posts: posts.map((p) => ({
+            title: p.title,
+            body: p.body.length > 1000 ? p.body.substring(0, 1000) : p.body,
+            tag: p.tag || "創作",
+          })),
+          forceRefresh: true,
+        });
+
         if (!result.text) {
           errors.push({
             email,
@@ -125,22 +139,8 @@ export async function POST() {
           continue;
         }
 
-        const tagCounts: Record<string, number> = {};
-        posts.forEach((p) => {
-          const tag = String(p.tag || "創作").trim() || "創作";
-          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-        });
-
-        const sortedTags = Object.entries(tagCounts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 3)
-          .map(([tag]) => tag);
-
-        const finalTags = sortedTags.length > 0
-          ? sortedTags.concat(["文芸部"]).slice(0, 3)
-          : ["創作", "文芸部", "投稿傾向"];
-
-        const tagsJson = JSON.stringify(finalTags.map((tag) => `#${tag.slice(0, 12)}`));
+        const finalTags = tagsResult.tags;
+        const tagsJson = JSON.stringify(finalTags);
         const summary = String(result.text).replace(/\s+/g, " ").trim().slice(0, MEMBER_SUMMARY_MAX_LENGTH);
         const nowSec = Math.floor(Date.now() / 1000);
 

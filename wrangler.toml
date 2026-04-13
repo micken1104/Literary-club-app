@@ -2,6 +2,9 @@ name = "my-lit-club-app"
 main = "src/index.ts"
 compatibility_date = "2024-01-01"
 
+[triggers]
+crons = ["0 0 * * 1"]
+
 # D1 Database Binding
 [[d1_databases]]
 binding = "DB"
