@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef } from "react";
 import { useSession } from "next-auth/react";
+import Link from "next/link";
 import { useAppTheme } from "@/app/hooks/useAppTheme";
 import { Card, CardBody, Chip } from "@/app/components/ui";
 import { Users } from "lucide-react";
@@ -128,10 +129,11 @@ export function MembersTabContent() {
             : ["#文芸部", "#創作", "#部員紹介"]);
 
           return (
-            <Card key={member.email} shadow="none" theme={appTheme}
-              className={appTheme === "street" ? "bg-linear-to-br from-cyan-200 to-blue-300" : ""}
-            >
-              <CardBody className="p-5 space-y-3">
+            <Link key={member.email} href={`/members/${encodeURIComponent(member.email)}`} className="block">
+              <Card shadow="none" theme={appTheme}
+                className={`${appTheme === "street" ? "bg-linear-to-br from-cyan-200 to-blue-300" : ""} hover:translate-y-[-2px] transition-transform`}
+              >
+                <CardBody className="p-5 space-y-3">
                 <div className="flex items-center gap-3">
                   {iconUrl ? (
                     <img
@@ -166,8 +168,9 @@ export function MembersTabContent() {
                     </Chip>
                   ))}
                 </div>
-              </CardBody>
-            </Card>
+                </CardBody>
+              </Card>
+            </Link>
           );
         })
       )}
