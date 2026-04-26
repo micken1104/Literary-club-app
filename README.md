@@ -29,6 +29,8 @@
 npm run dev
 ```
 
+環境変数は `.env.example` をコピーして `.env.local` を作成し、値を設定してください。
+
 必要に応じて `yarn dev` / `pnpm dev` / `bun dev` を使用できます。
 
 起動後に `http://localhost:3000` を開いてください。
@@ -45,6 +47,16 @@ CLOUDFLARE_API_TOKEN=your_ai_token
 ```
 
 `CLOUDFLARE_AI_API_TOKEN` が優先され、`CLOUDFLARE_API_TOKEN` も互換用に利用できます。
+
+### データベース (Cloudflare D1)
+
+```bash
+CLOUDFLARE_ACCOUNT_ID=your_account_id
+CLOUDFLARE_D1_DATABASE_ID=your_main_database_id
+CLOUDFLARE_API_TOKEN=your_api_token
+```
+
+掲示板テーブル（`boardThreads`, `boardComments`）も `CLOUDFLARE_D1_DATABASE_ID` の同一DB内で運用します。
 
 ### アイコン保存 (Cloudflare R2)
 

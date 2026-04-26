@@ -185,6 +185,7 @@ DynamoDB ではできなかった複雑なクエリが可能に！
 - [ ] Cloudflare アカウント作成
 - [ ] D1 データベース作成
 - [ ] テーブル作成（SQL 実行）
+- [ ] 掲示板テーブル作成（`migrations/0014_create_board_tables.sql` を同一DBで実行）
 - [ ] API トークン発行
 - [ ] GitHub Secrets 設定
 - [ ] Cloudflare Pages 連携

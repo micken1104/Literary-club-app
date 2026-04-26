@@ -10,17 +10,19 @@ import {
   Spinner
 } from "@/app/components/ui";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/app/components/ui/Tabs";
-import { Users, AlertCircle, FileText, Target } from "lucide-react";
+import { Users, AlertCircle, FileText, Target, MessageSquareText } from "lucide-react";
 import { 
   HandDrawnSettingsIcon,
   LiquidMetalPostIcon,
   LiquidMetalTopicIcon,
+  LiquidMetalBoardIcon,
   LiquidMetalPeopleIcon,
   ChromeSettingsIcon,
 } from "@/app/components/HandDrawnIcons";
 import { PostsTabContent } from "@/app/components/home/PostsTabContent";
 import { TopicsTabContent } from "@/app/components/home/TopicsTabContent";
 import { MembersTabContent } from "@/app/components/home/MembersTabContent";
+import { BoardTabContent } from "@/app/components/home/BoardTabContent";
 import { TopicDecisionModal } from "@/app/components/home/TopicDecisionModal";
 import { ProposalModal } from "@/app/components/home/ProposalModal";
 import { PostCreateModal } from "@/app/components/home/PostCreateModal";
@@ -68,7 +70,7 @@ export default function Home() {
   const [isTopicDecisionModalOpen, setIsTopicDecisionModalOpen] = useState(false);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [isProposalModalOpen, setIsProposalModalOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<"posts" | "topics" | "members">("posts");
+  const [activeTab, setActiveTab] = useState<"posts" | "topics" | "board" | "members">("posts");
 
   // カスタムフック
   const {
@@ -83,7 +85,6 @@ export default function Home() {
 
   useEffect(() => {
     if (status !== "loading") {
-      setSessionLoadTimedOut(false);
       return;
     }
 
@@ -196,9 +197,9 @@ export default function Home() {
       {/* タブナビゲーション */}
       <Tabs
         selectedKey={activeTab}
-        onSelectionChange={(key) => setActiveTab(key as "posts" | "topics" | "members")}
+        onSelectionChange={(key) => setActiveTab(key as "posts" | "topics" | "board" | "members")}
       >
-        <TabsList theme={appTheme}>
+        <TabsList theme={appTheme} className="grid-cols-4">
           <TabsTrigger value="posts" theme={appTheme}>
             <span className="flex items-center gap-2">
               {appTheme === "chrome" ? (
@@ -222,6 +223,19 @@ export default function Home() {
                 </span>
               )}
               お題
+            </span>
+          </TabsTrigger>
+
+          <TabsTrigger value="board" theme={appTheme}>
+            <span className="flex items-center gap-2">
+              {appTheme === "chrome" ? (
+                <MessageSquareText size={20} strokeWidth={2.5} className="text-white" />
+              ) : (
+                <span className="chrome-tab-icon-wrap">
+                  <LiquidMetalBoardIcon size={20} className="chrome-tab-icon" />
+                </span>
+              )}
+              掲示板
             </span>
           </TabsTrigger>
 
@@ -250,6 +264,10 @@ export default function Home() {
             onOpenTopicDecision={() => setIsTopicDecisionModalOpen(true)}
             onCreateProposal={() => setIsProposalModalOpen(true)}
           />
+        </TabsContent>
+
+        <TabsContent value="board">
+          <BoardTabContent />
         </TabsContent>
 
         <TabsContent value="members">

@@ -91,8 +91,6 @@ Cloudflare ダッシュボード：[https://dash.cloudflare.com](https://dash.cl
 **取得する情報**（後で必要）：
 - Database ID（ダッシュボードの「概要」タブに表示）
 
----
-
 ### ステップ 2️⃣ D1 テーブルを作成
 
 Cloudflare 側で以下の SQL を実行：
@@ -138,6 +136,15 @@ CREATE INDEX IF NOT EXISTS idx_likes_postId ON likes(postId);
 1. Cloudflare ダッシュボード → D1 → `lit-club-database`
 2. **「Console」** タブをクリック
 3. 上の SQL をコピペして実行
+
+### ステップ 2.5️⃣ 掲示板専用テーブルを作成
+
+メインDB（例：`lit-club-database`）の Console で、
+`migrations/0014_create_board_tables.sql` の SQL を実行します。
+
+作成されるテーブル：
+- `boardThreads`
+- `boardComments`
 
 ---
 

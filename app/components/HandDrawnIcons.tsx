@@ -107,6 +107,14 @@ export const LiquidMetalPeopleIcon = ({ size = 24, className = "" }: { size?: nu
   </IconBase>
 );
 
+export const LiquidMetalBoardIcon = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
+  <IconBase size={size} className={className} emoji="💬">
+    <path d="M4 6.5C4 5.1 5.1 4 6.5 4h11C18.9 4 20 5.1 20 6.5v7c0 1.4-1.1 2.5-2.5 2.5h-5L8 20v-4H6.5C5.1 16 4 14.9 4 13.5z" fill="#ffffff" />
+    <rect x="7" y="8" width="10" height="1.5" fill="#000000" opacity="0.3" />
+    <rect x="7" y="11.2" width="7" height="1.5" fill="#000000" opacity="0.3" />
+  </IconBase>
+);
+
 export const ChromeSettingsIcon = ({ size = 24, className = "" }: { size?: number; className?: string }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" className={className}>
     <rect x="11" y="1.5" width="2" height="4" fill="#ffffff" />

@@ -21,7 +21,7 @@ const fab = tv({
   variants: {
     theme: {
       street: "bg-yellow-400 text-black border-4 border-white shadow-[0_8px_0_rgba(0,0,0,0.9)] hover:shadow-[0_10px_0_rgba(0,0,0,0.9)] hover:translate-y-[-2px] active:translate-y-[2px] active:shadow-[0_6px_0_rgba(0,0,0,0.9)] shake-hover",
-      chrome: "bg-gray-600 text-white border-0 shadow-[0_8px_0_rgba(20,20,20,0.9)] hover:shadow-[0_10px_0_rgba(20,20,20,0.9)] hover:bg-gray-500 hover:translate-y-[-2px] active:translate-y-[2px] active:shadow-[0_6px_0_rgba(20,20,20,0.9)]",
+      chrome: "bg-[#143021] text-[#e6ffef] border border-[#3a7b56] shadow-[0_8px_0_rgba(8,14,10,0.9)] hover:shadow-[0_10px_0_rgba(8,14,10,0.9)] hover:bg-[#1a3f2b] hover:translate-y-[-2px] active:translate-y-[2px] active:shadow-[0_6px_0_rgba(8,14,10,0.9)]",
       library: "bg-library-surface text-[#3F3427] border-0 shadow-library-neu-sm hover:shadow-library-neu-hover",
     },
   },
@@ -94,12 +94,12 @@ export function PostsTabContent({
 
   return (
     <>
-      <div className="p-3 space-y-3">
+      <div className="p-3 space-y-3 chrome:bg-[#0f1411] rounded-md">
         {(freePosts.length === 0 && topicReplies.length === 0) ? (
           <div className="p-10 text-center">
             <Save size={34} className="mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-500 text-sm font-medium">まだ投稿がありません</p>
-            <p className="text-gray-400 text-xs mt-2">右下のボタンから投稿を作成できます。</p>
+            <p className="text-gray-500 chrome:text-[#b8ffd1] text-sm font-medium">まだ投稿がありません</p>
+            <p className="text-gray-400 chrome:text-[#9fc6ad] text-xs mt-2">右下のボタンから投稿を作成できます。</p>
           </div>
         ) : (
           <>
@@ -110,7 +110,7 @@ export function PostsTabContent({
                   key={post.id}
                   shadow="none"
                   theme={appTheme}
-                  className={appTheme !== "chrome" ? "bg-white" : ""}
+                  className={appTheme !== "chrome" ? "bg-white" : "chrome:bg-[#111915] chrome:border chrome:border-[#305f45]"}
                 >
                   <CardBody className="p-4 gap-3">
                     <div className="flex items-center justify-between">
@@ -124,7 +124,7 @@ export function PostsTabContent({
                         ) : (
                           <div className="w-8 h-8 min-w-8 min-h-8 shrink-0 rounded-full bg-yellow-300 border-2 border-black chrome:border-white" />
                         )}
-                        <span className="font-black text-base uppercase text-black chrome:text-green-300">{getDisplayName(post.authorEmail, post.author)}</span>
+                        <span className="font-black text-base uppercase text-black chrome:text-[#e2ffec]">{getDisplayName(post.authorEmail, post.author)}</span>
                         {isTopicReply ? (
                           <Chip
                             size="md"
@@ -143,7 +143,7 @@ export function PostsTabContent({
                           </Chip>
                         )}
                       </div>
-                      <span className="text-xs font-bold text-gray-700 chrome:text-gray-300 uppercase">
+                      <span className="text-xs font-bold text-gray-700 chrome:text-[#9fc6ad] uppercase">
                         {new Date(post.createdAt).toLocaleDateString('ja-JP')}
                       </span>
                     </div>
@@ -152,16 +152,16 @@ export function PostsTabContent({
                       href={`/topic/${post.id}`}
                       className="block spray-hover"
                     >
-                      <h3 className="text-xl font-black mb-2 uppercase tracking-wide text-black chrome:text-green-200">{post.title}</h3>
-                      <p className="text-sm font-semibold text-gray-700 chrome:text-green-100 line-clamp-3 whitespace-pre-wrap">{post.body}</p>
+                      <h3 className="text-xl font-black mb-2 uppercase tracking-wide text-black chrome:text-[#e6ffef]">{post.title}</h3>
+                      <p className="text-sm font-semibold text-gray-700 chrome:text-[#c7ffd9] line-clamp-3 whitespace-pre-wrap">{post.body}</p>
                       <div className="mt-2 flex items-center justify-between gap-3 text-xs font-bold">
-                        <p className="text-orange-600 chrome:text-yellow-300 uppercase">→ クリックして詳細表示</p>
+                        <p className="text-orange-600 chrome:text-[#9dffc0] uppercase">→ クリックして詳細表示</p>
                         <div className="flex items-center gap-4 text-[1.08rem] leading-normal pt-0.5 pb-1 pr-1 overflow-visible">
-                          <span className="flex items-center gap-2 text-blue-600 chrome:text-cyan-400 leading-normal min-w-max">
+                          <span className="flex items-center gap-2 text-blue-600 chrome:text-[#b8ffd1] leading-normal min-w-max">
                             {appTheme === "chrome" ? <ChromeMessageIcon size={21} /> : <HandDrawnCommentIcon size={21} className="overflow-visible shrink-0" />}
                             {post.commentCount || 0}
                           </span>
-                          <span className="flex items-center gap-2 text-red-500 chrome:text-pink-400 leading-normal min-w-max">
+                          <span className="flex items-center gap-2 text-red-500 chrome:text-[#9dffc0] leading-normal min-w-max">
                             <HandDrawnHeartIcon size={21} className="overflow-visible shrink-0" />
                             {post.likes || 0}
                           </span>
@@ -172,9 +172,9 @@ export function PostsTabContent({
                     {session && (
                       <div className="space-y-2">
                         {reviewByPostId[post.id] && (
-                          <div className="p-3 rounded-lg border-2 border-black/80 chrome:border-white/60 bg-white/90 chrome:bg-black/40">
-                            <p className="text-xs font-black uppercase text-gray-700 chrome:text-green-300 mb-1">AI講評</p>
-                            <p className="text-sm font-semibold text-gray-800 chrome:text-gray-100 whitespace-pre-wrap">
+                          <div className="p-3 rounded-lg border-2 border-black/80 chrome:border-[#3a7b56] bg-white/90 chrome:bg-[#132019]">
+                            <p className="text-xs font-black uppercase text-gray-700 chrome:text-[#9dffc0] mb-1">AI講評</p>
+                            <p className="text-sm font-semibold text-gray-800 chrome:text-[#e6ffef] whitespace-pre-wrap">
                               {reviewByPostId[post.id]}
                             </p>
                           </div>

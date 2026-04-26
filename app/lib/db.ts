@@ -411,3 +411,7 @@ export function getD1Client(): D1Client {
 
   return new D1Client(accountId, databaseId, apiToken);
 }
+
+export function getBoardD1Client(): D1Client {
+  return getD1Client();
+}

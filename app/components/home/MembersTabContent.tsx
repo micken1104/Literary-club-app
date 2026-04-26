@@ -16,7 +16,7 @@ const memberSection = tv({
   variants: {
     theme: {
       street: "rounded-lg bg-white chrome:bg-black border-3 border-black chrome:border-white p-3",
-      chrome: "pt-3 border-t border-white/20",
+      chrome: "rounded-lg bg-[#132019] p-3 border border-[#3a7b56]",
       library: "rounded-xl bg-library-cream p-3 shadow-library-neu-inset-subtle",
     },
   },
@@ -27,7 +27,7 @@ const memberAiSection = tv({
   variants: {
     theme: {
       street: "rounded-lg bg-pink-200 chrome:bg-black border-3 border-black chrome:border-white p-3",
-      chrome: "pt-3 border-t border-white/20",
+      chrome: "rounded-lg bg-[#141d18] p-3 border border-[#3a7b56]",
       library: "rounded-xl bg-library-cream p-3 shadow-library-neu-inset-subtle",
     },
   },
@@ -110,7 +110,7 @@ export function MembersTabContent() {
   const sessionEmail = session?.user?.email;
 
   return (
-    <div className="p-4 space-y-3">
+    <div className="p-4 space-y-3 chrome:bg-[#0f1411] rounded-md">
       {memberProfiles.length === 0 ? (
         <Card shadow="sm" theme={appTheme}>
           <CardBody className="p-6 text-center space-y-2">
@@ -131,7 +131,7 @@ export function MembersTabContent() {
           return (
             <Link key={member.email} href={`/members/${encodeURIComponent(member.email)}`} className="block">
               <Card shadow="none" theme={appTheme}
-                className={`${appTheme === "street" ? "bg-linear-to-br from-cyan-200 to-blue-300" : ""} hover:translate-y-[-2px] transition-transform`}
+                className={`${appTheme === "street" ? "bg-linear-to-br from-cyan-200 to-blue-300" : ""} chrome:bg-[#111915] chrome:border chrome:border-[#305f45] hover:translate-y-[-2px] transition-transform`}
               >
                 <CardBody className="p-5 space-y-3">
                 <div className="flex items-center gap-3">
@@ -144,18 +144,18 @@ export function MembersTabContent() {
                   ) : (
                     <div className="w-20 h-20 rounded-full bg-yellow-300 border-2 border-black chrome:border-white shadow-street-hard-xs" />
                   )}
-                  <p className="font-black text-xl uppercase tracking-wide text-black chrome:text-white">{displayName}</p>
+                  <p className="font-black text-xl uppercase tracking-wide text-black chrome:text-[#e6ffef]">{displayName}</p>
                 </div>
 
                 <div className={memberSection({ theme: appTheme })}>
-                  <p className="text-xs font-black uppercase text-black chrome:text-white mb-1">自己紹介</p>
-                  <p className="text-sm font-semibold text-black chrome:text-white">{member.selfIntro || "未設定"}</p>
+                  <p className="text-xs font-black uppercase text-black chrome:text-[#9dffc0] mb-1">自己紹介</p>
+                  <p className="text-sm font-semibold text-black chrome:text-[#e6ffef]">{member.selfIntro || "未設定"}</p>
                 </div>
 
                 {(aiReadingEnabled || member.email !== sessionEmail) && (
                   <div className={memberAiSection({ theme: appTheme })}>
-                    <p className="text-xs font-black uppercase text-black chrome:text-white mb-1">AI短文分析</p>
-                    <p className="text-sm font-semibold text-black chrome:text-white">
+                    <p className="text-xs font-black uppercase text-black chrome:text-[#9dffc0] mb-1">AI短文分析</p>
+                    <p className="text-sm font-semibold text-black chrome:text-[#e6ffef]">
                       {member.aiSummary || analysisByMemberKey[member.email] || "分析を作成中です..."}
                     </p>
                   </div>
@@ -163,7 +163,7 @@ export function MembersTabContent() {
 
                 <div className="flex flex-wrap gap-2">
                   {displayTags.map((tag, index) => (
-                    <Chip key={`${member.email}-${tag}-${index}`} size="md" className="bg-yellow-300 chrome:bg-black text-black chrome:text-white font-bold border-2 border-black chrome:border-white">
+                    <Chip key={`${member.email}-${tag}-${index}`} size="md" className="bg-yellow-300 chrome:bg-[#143021] text-black chrome:text-[#e6ffef] font-bold border-2 border-black chrome:border-[#3a7b56]">
                       {tag}
                     </Chip>
                   ))}
