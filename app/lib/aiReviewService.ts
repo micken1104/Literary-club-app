@@ -464,8 +464,7 @@ export async function generateMemberTagsWithCache(
   }
 
   const ai = getAIClient();
-  const raw = await ai.generateMemberHashtags(params.penName, normalizedPosts);
-  const tags = parseMemberTags(raw);
+  const tags = await ai.generateMemberHashtags(params.penName, normalizedPosts);
 
   if (tags.length === 3) {
     await upsertCache(
